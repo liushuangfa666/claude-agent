@@ -26,3 +26,6 @@ env/
 # Environment variables
 .env
 .env.local
+
+# GitHub
+.github/
