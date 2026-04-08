@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from .types import FrontmatterMetadata, MemoryHeader, MemoryIndex, MemoryType
+from .types import FrontmatterMetadata, MemoryHeader, MemoryIndex, MemoryType, _get_memory_type_value
 
 
 class MemoryStore:

@@ -76,7 +76,7 @@ class CoordinatorAgent:
             浏览计划
         """
         # 分析目标复杂度
-        complexity = self._analyze_goal_complexity(goal)
+        complexity = self._analyze_goal_complexity(goal, start_url)
 
         if complexity == "simple":
             # 简单目标：单次抓取
@@ -105,7 +105,7 @@ class CoordinatorAgent:
                 "steps": self._plan_multi_step(goal, start_url)
             }
 
-    def _analyze_goal_complexity(self, goal: str) -> str:
+    def _analyze_goal_complexity(self, goal: str, start_url: str | None) -> str:
         """分析目标复杂度"""
         complex_indicators = [
             "多个", "所有", "搜索", "查找", "比较",

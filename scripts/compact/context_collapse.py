@@ -167,7 +167,7 @@ class ContextCollapser:
         Returns:
             collapse_id: 折叠 ID
         """
-        message_ids = [msg.get("id", f"msg_{i}") for i in range(start_idx, end_idx + 1)]
+        message_ids = [messages[i].get("id", f"msg_{i}") for i in range(start_idx, end_idx + 1)]
         return self._store.stage(message_ids, summary)
 
     def apply_collapse(

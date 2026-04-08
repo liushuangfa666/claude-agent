@@ -18,7 +18,7 @@ S = TypeVar("S")
 ListenerId = int
 
 
-def is(x, y) -> bool:
+def object_is(x, y) -> bool:
     """
     Object.is 语义比较
 
@@ -92,7 +92,7 @@ class Store(Generic[T]):
         prev = deepcopy(self._state)
         next_state = updater(self._state)
 
-        if is(prev, next_state):
+        if object_is(prev, next_state):
             return
 
         self._state = deepcopy(next_state)

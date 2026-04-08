@@ -36,7 +36,7 @@ try:
         LSPTypeDefinitionTool,
     )
     from .session.manager import SessionManager
-    from .tool import BashTool, GlobTool, GrepTool, ReadTool, WriteTool
+    from .tools import BashTool, GlobTool, GrepTool, ReadTool, WriteTool
 except ImportError:
     from agent import create_agent
     from lsp_tool import (
@@ -48,7 +48,7 @@ except ImportError:
         LSPTypeDefinitionTool,
     )
     from session.manager import SessionManager
-    from tool import BashTool, GlobTool, GrepTool, ReadTool, WriteTool
+    from tools import BashTool, GlobTool, GrepTool, ReadTool, WriteTool
 
 
 def cmd_start(args):
