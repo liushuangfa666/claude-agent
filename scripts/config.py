@@ -18,7 +18,7 @@ DEFAULT_CONFIG = {
     "max_turns": 20,
     "timeout": 180,
     "parallel_tool_calls": True,
-    "multi_agent_enabled": False,
+    "multi_agent_enabled": True,
     "lsp": {},
     "permission": {
         "default": "ask",
@@ -37,7 +37,7 @@ class AgentConfig:
     max_turns: int = 20
     timeout: int = 180
     parallel_tool_calls: bool = True
-    multi_agent_enabled: bool = False
+    multi_agent_enabled: bool = True
 
 
 @dataclass
@@ -50,7 +50,7 @@ class Config:
     max_turns: int = 20
     timeout: int = 180
     parallel_tool_calls: bool = True
-    multi_agent_enabled: bool = False
+    multi_agent_enabled: bool = True
     lsp: dict = field(default_factory=dict)
     permission: dict = field(default_factory=dict)
     _changed_callbacks: list[Callable] = field(default_factory=list)
