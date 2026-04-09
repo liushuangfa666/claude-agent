@@ -1866,15 +1866,12 @@ async function streamChat(msg) {
               // 显示授权对话框
               if (event.auth_required) {
                 const [toolName, args, reason] = event.auth_required;
-                const confirmed = confirm(`工具 "${toolName}" 需要授权\\n\\n原因: ${reason || '未提供'}\\n\\n参数: ${JSON.stringify(args, null, 2)}\\n\\n是否允许?`);
+                const confirmed = confirm(`工具 "${toolName}" 需要授权\n\n原因: ${reason || '未提供'}\n\n参数: ${JSON.stringify(args, null, 2)}\n\n是否允许?`);
                 if (confirmed) {
                   // 用户允许，更新权限
-                  await api('/api/session/tools', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                      session_id: currentSessionId,
-                      tool_rules: [`${toolName}(*):allow`]
-                    })
+                  await api('/api/session/tools', 'POST', {
+                    session_id: currentSession,
+                    tool_rules: [`${toolName}(*):allow`]
                   });
                   addMessage('system', `✅ 您已授权工具 ${toolName}，请继续发送消息重试`);
                 } else {
