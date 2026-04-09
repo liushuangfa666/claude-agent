@@ -2108,6 +2108,7 @@ class Agent:
 
             # 调用 LLM
             try:
+                logger.info(f"[DEBUG] API call: messages={len(api_messages)}, tools={len(tools)}, tool_names={[t['name'] for t in tools]}")
                 response = call_llm(
                     api_messages,
                     model=self.config.model,
@@ -2117,6 +2118,10 @@ class Agent:
                     api_key=self.config.api_key,
                     tools=tools,
                 )
+
+                # DEBUG: 打印响应摘要
+                resp_str = str(response)[:500]
+                logger.info(f"[DEBUG] LLM response (first 500 chars): {resp_str}")
 
                 # 触发 LLMComplete Hook
                 await self._trigger_hook("LLMComplete", {
@@ -2162,6 +2167,7 @@ class Agent:
             # 解析 LLM 响应的所有 content blocks
             try:
                 blocks = parse_content_blocks(response)
+                logger.info(f"[DEBUG] parsed blocks: {blocks}")
             except Exception as e:
                 yield StreamEvent(type="tool_error", error=f"[解析响应失败] {e}\n响应: {str(response)[:300]}")
                 yield StreamEvent(type="done", content=f"[解析错误] {e}")
