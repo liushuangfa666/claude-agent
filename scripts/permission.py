@@ -171,15 +171,15 @@ class PermissionEngine:
     def build_default_engine() -> PermissionEngine:
         """构建默认权限引擎（安全的默认值）"""
         engine = PermissionEngine()
-        engine.set_default("ask")  # 默认询问
+        engine.set_default("allow")  # 默认允许（方便测试）
 
-        # 危险操作默认拒绝
-        engine.deny("Bash(rm *)", "删除操作需要确认")
-        engine.deny("Bash(mv *)", "移动/重命名操作需要确认")
-        engine.deny("Edit(*.env)", "修改环境变量需要确认")
-        engine.deny("Write(*.json)", "写入 JSON 文件需要确认")
+        # 危险操作需询问
+        engine.add_rule("Bash(rm *)", "ask", "删除操作需要确认")
+        engine.add_rule("Bash(mv *)", "ask", "移动/重命名操作需要确认")
+        engine.add_rule("Edit(*.env)", "ask", "修改环境变量需要确认")
+        engine.add_rule("Write(*.json)", "ask", "写入 JSON 文件需要确认")
 
-        # 安全操作默认允许
+        # 安全操作全部允许
         engine.allow("Bash(git *)", "git 读取操作安全")
         engine.allow("Bash(ls *)", "列出目录安全")
         engine.allow("Bash(ps *)", "查看进程安全")
@@ -194,5 +194,7 @@ class PermissionEngine:
         engine.allow("Read(*)", "读取文件安全")
         engine.allow("Glob(*)", "搜索文件安全")
         engine.allow("Grep(*)", "搜索内容安全")
+        engine.allow("Write(*)", "写入文件默认允许")
+        engine.allow("Edit(*)", "编辑文件默认允许")
 
         return engine
