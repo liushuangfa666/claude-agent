@@ -322,7 +322,9 @@ def parse_content_blocks(response: dict) -> list[dict]:
                 tool_calls = _extract_tool_calls_from_text(thinking_text)
                 for tc in tool_calls:
                     blocks.append({"type": "tool_use", "name": tc[0], "input": tc[1]})
-                # thinking 块本身不输出
+                # thinking 内容也输出（作为特殊文本块）
+                if thinking_text.strip():
+                    blocks.append({"type": "thinking_text", "text": thinking_text.strip()})
             elif block_type == "tool_use":
                 blocks.append(block)
             elif block_type == "text":
@@ -2206,7 +2208,7 @@ class Agent:
             for block in blocks:
                 block_type = block.get("type", "")
 
-                if block_type == "text":
+                if block_type == "text" or block_type == "thinking_text":
                     text_blocks.append(block)
                 elif block_type == "tool_use":
                     has_tool_calls = True
