@@ -11,9 +11,14 @@ import json
 import os
 import sys
 
+# 把 scripts 目录加入路径（__file__ = scripts/start_web.py）
+_scripts_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.dirname(_scripts_dir)
+sys.path.insert(0, _project_root)
+
 # 切换到配置的 workspace（如果存在）
 _config_paths = [
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "crush.json"),
+    os.path.join(_project_root, "claude.json"),
     os.path.expanduser("~/.config/crush/crush.json"),
 ]
 for config_path in _config_paths:
@@ -28,10 +33,6 @@ for config_path in _config_paths:
         except Exception:
             pass
         break
-
-# 把 scripts 目录加入路径
-_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
-sys.path.insert(0, _scripts_dir)
 
 import argparse  # noqa: E402, I001
 from web_server import start_server  # noqa: E402, I001
