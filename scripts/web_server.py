@@ -31,6 +31,7 @@ try:
     )
     from .permission import PermissionEngine
     from .tools import BashTool, EditTool, GlobTool, GrepTool, ReadTool, WriteTool
+    from .tools_advanced import ToolListAllTool
 except ImportError:
     from agent import Agent, AgentConfig, create_agent
     from config import get_config, update_config, get_config_manager
@@ -44,6 +45,7 @@ except ImportError:
     )
     from permission import PermissionEngine
     from tools import BashTool, EditTool, GlobTool, GrepTool, ReadTool, WriteTool
+    from tools_advanced import ToolListAllTool
 
 # ============ 统计和状态 ============
 
@@ -241,6 +243,7 @@ def _create_agent_for_session(session_id: str, allowed_tools: list[str] | None =
         ("LSPTypeDefinition", LSPTypeDefinitionTool()),
         ("LSPReferences", LSPReferencesTool()),
         ("LSPSymbols", LSPSymbolsTool()),
+        ("ToolListAll", ToolListAllTool()),
     ]
 
     # 根据 allowed_tools 过滤工具
