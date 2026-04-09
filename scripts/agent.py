@@ -681,20 +681,20 @@ class Agent:
             logger.info("Explicit save detected in session, skipping auto extraction")
             return
 
+        # 更新提取轮次计数
+        self._auto_extract_turn_counter += 1
+
+        # 检查是否达到提取间隔
+        if self._auto_extract_turn_counter < self.config.auto_extract_interval:
+            return
+
+        # 重置计数
+        self._auto_extract_turn_counter = 0
+
+        # 执行记忆提取
         try:
             from .memory.extract_memories import extract_memories_from_messages
 
-            # 更新提取轮次计数
-            self._auto_extract_turn_counter += 1
-
-            # 检查是否达到提取间隔
-            if self._auto_extract_turn_counter < self.config.auto_extract_interval:
-                return
-
-            # 重置计数
-            self._auto_extract_turn_counter = 0
-
-            # 执行记忆提取（在后台异步执行，不阻塞主流程）
             logger.info("Starting auto memory extraction...")
             result = await extract_memories_from_messages(
                 messages=self.messages,
@@ -2323,8 +2323,11 @@ class Agent:
                         self._session_memory.save()
                     except Exception as e:
                         logger.error(f"Failed to save session memory: {e}")
-                # 触发自动记忆提取
-                await self._trigger_auto_memory_extraction()
+                # 触发自动记忆提取（确保异常不会中断流）
+                try:
+                    await self._trigger_auto_memory_extraction()
+                except Exception as e:
+                    logger.error(f"Memory extraction error: {e}")
                 # 输出 token 使用信息
                 self._print_usage()
                 # 保存 Session
