@@ -36,6 +36,14 @@ Thumbs.db
 crush.session
 .claude/settings.local.json
 
+# Config with API keys (keep local, don't push)
+crush.json
+claude.json
+
+# Dev/test docs (local only)
+docs/test-plan.md
+docs/test-report.md
+
 # Local data (153MB DB, logs)
 .crush/
 

@@ -1866,16 +1866,108 @@ async function streamChat(msg) {
               // 显示授权对话框
               if (event.auth_required) {
                 const [toolName, args, reason] = event.auth_required;
-                const confirmed = confirm(`工具 "${toolName}" 需要授权\n\n原因: ${reason || '未提供'}\n\n参数: ${JSON.stringify(args, null, 2)}\n\n是否允许?`);
-                if (confirmed) {
-                  // 用户允许，更新权限
+
+                // 获取当前已授权的规则
+                let authorizedRules = [];
+                try {
+                  const rulesResult = await api('/api/session/rules', 'POST', {
+                    session_id: currentSession
+                  });
+                  authorizedRules = rulesResult.rules || [];
+                } catch (e) {
+                  console.error('Failed to fetch rules:', e);
+                }
+
+                // 检查当前工具是否已被授权
+                const currentToolPattern = `${toolName}(*)`;
+                const isAlreadyAuthorized = authorizedRules.some(r => r.pattern === currentToolPattern);
+
+                // 创建自定义对话框
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+                const dialog = document.createElement('div');
+                dialog.style.cssText = 'background:white;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.2);font-family:system-ui,sans-serif;';
+
+                let html = `
+                  <h3 style="margin:0 0 16px 0;color:#333;">🔐 工具授权</h3>
+                  <div style="margin-bottom:16px;padding:12px;background:#f5f5f5;border-radius:8px;">
+                    <div style="font-weight:bold;color:#d97706;">请求授权: ${toolName}</div>
+                    <div style="font-size:13px;color:#666;margin-top:4px;">原因: ${reason || '未提供'}</div>
+                    <div style="font-size:12px;color:#999;margin-top:4px;">参数: ${JSON.stringify(args || {}, null, 2)}</div>
+                  </div>
+                `;
+
+                if (authorizedRules.length > 0) {
+                  html += `<div style="margin-bottom:16px;">
+                    <div style="font-weight:bold;margin-bottom:8px;color:#333;">✅ 已授权的工具（勾选表示允许）</div>`;
+                  authorizedRules.forEach(r => {
+                    const checked = r.pattern === currentToolPattern ? 'checked' : '';
+                    html += `<label style="display:block;padding:8px;background:#f0fdf4;border-radius:6px;margin-bottom:6px;cursor:pointer;">
+                      <input type="checkbox" class="auth-rule-checkbox" value="${r.pattern}" ${checked} style="margin-right:8px;">
+                      <span style="font-family:monospace;font-size:13px;">${r.pattern}</span>
+                      <span style="font-size:12px;color:#666;margin-left:8px;">${r.reason || ''}</span>
+                    </label>`;
+                  });
+                  html += `</div>`;
+                }
+
+                if (!isAlreadyAuthorized) {
+                  html += `<label style="display:block;padding:8px;background:#fef3c7;border-radius:6px;margin-bottom:16px;cursor:pointer;">
+                    <input type="checkbox" class="auth-rule-checkbox" value="${currentToolPattern}" checked style="margin-right:8px;">
+                    <span style="font-family:monospace;font-size:13px;">${currentToolPattern}</span>
+                    <span style="font-size:12px;color:#666;margin-left:8px;">新授权</span>
+                  </label>`;
+                }
+
+                html += `
+                  <div style="display:flex;gap:12px;justify-content:flex-end;">
+                    <button id="authCancelBtn" style="padding:10px 20px;border:1px solid #ddd;background:white;border-radius:8px;cursor:pointer;font-size:14px;">取消</button>
+                    <button id="authConfirmBtn" style="padding:10px 20px;border:none;background:#2563eb;color:white;border-radius:8px;cursor:pointer;font-size:14px;">确认授权</button>
+                  </div>
+                `;
+
+                dialog.innerHTML = html;
+                overlay.appendChild(dialog);
+                document.body.appendChild(overlay);
+
+                // 等待用户操作
+                const result = await new Promise((resolve) => {
+                  document.getElementById('authConfirmBtn').onclick = () => {
+                    // 收集所有选中的规则
+                    const checkboxes = document.querySelectorAll('.auth-rule-checkbox');
+                    const selectedRules = [];
+                    checkboxes.forEach(cb => {
+                      if (cb.checked) {
+                        selectedRules.push(`${cb.value}:allow`);
+                      } else {
+                        selectedRules.push(`${cb.value}:deny`);
+                      }
+                    });
+                    overlay.remove();
+                    resolve(selectedRules);
+                  };
+                  document.getElementById('authCancelBtn').onclick = () => {
+                    overlay.remove();
+                    resolve(null);
+                  };
+                  overlay.onclick = (e) => {
+                    if (e.target === overlay) {
+                      overlay.remove();
+                      resolve(null);
+                    }
+                  };
+                });
+
+                if (result) {
+                  // 更新权限
                   await api('/api/session/tools', 'POST', {
                     session_id: currentSession,
-                    tool_rules: [`${toolName}(*):allow`]
+                    tool_rules: result
                   });
-                  addMessage('system', `✅ 您已授权工具 ${toolName}，请继续发送消息重试`);
+                  addMessage('system', `✅ 权限已更新`);
                 } else {
-                  addMessage('system', `❌ 您已拒绝工具 ${toolName}`);
+                  addMessage('system', `❌ 您已取消授权`);
                 }
               }
               break;

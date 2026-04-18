@@ -251,6 +251,8 @@ def _create_agent_for_session(session_id: str, allowed_tools: list[str] | None =
         tools = [tool for name, tool in all_tools if name in allowed_tools]
     else:
         tools = [tool for _, tool in all_tools]
+        # 默认情况下只允许 all_tools 列表中的工具，不包含全局注册表中的额外工具
+        allowed_tools = [name for name, _ in all_tools]
 
     # 使用提供的 permission engine 或创建默认的
     engine = permission_engine or PermissionEngine.build_default_engine()
@@ -557,6 +559,29 @@ class AgentHandler(BaseHTTPRequestHandler):
                 "allowed_tools": session.allowed_tools
             })
 
+        elif path == "/api/session/rules":
+            # 获取当前 session 的权限规则
+            body = self.parse_body()
+            session_id = body.get("session_id", "default") if body else "default"
+
+            get_or_create_session(session_id)
+            engine = _permission_engines.get(session_id)
+
+            rules = []
+            if engine:
+                for rule in engine.rules:
+                    if rule.behavior == "allow":
+                        rules.append({
+                            "pattern": rule.pattern,
+                            "reason": rule.reason
+                        })
+
+            self.send_json({
+                "success": True,
+                "session_id": session_id,
+                "rules": rules
+            })
+
         else:
             self.send_json({"error": "not found"}, 404)
 
@@ -621,6 +646,7 @@ class AgentHandler(BaseHTTPRequestHandler):
                 client_disconnected = False
 
                 async def run_stream_async():
+                    logger.debug(f"[WS] agent.run_stream called, multi_agent={agent.config.multi_agent_enabled}")
                     agen = agent.run_stream(message)
                     accumulated_text = ""
                     accumulated_tool_output = {}
@@ -754,9 +780,14 @@ class AgentHandler(BaseHTTPRequestHandler):
 
 def start_server(port=18780):
     """启动 HTTP 服务"""
+    # 调试：打印当前配置
+    cfg = get_config()
+    print(f"[DEBUG] api_url: {cfg.api_url}", flush=True)
+    print(f"[DEBUG] api_key: {cfg.api_key[:10] if cfg.api_key else 'empty'}...", flush=True)
+
     # 注册配置变更回调
     get_config_manager().on_changed(lambda cfg: _recreate_all_agents())
-    
+
     server = ThreadedHTTPServer(("0.0.0.0", port), AgentHandler)
     print(f"[HTTP] Agent Web UI: http://localhost:{port}")
     print(f"       API: http://localhost:{port}/api/status")

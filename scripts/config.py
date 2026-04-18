@@ -125,13 +125,20 @@ class ConfigManager:
     def load(self) -> Config:
         """加载配置（从文件 + 环境变量）"""
         # 先加载文件配置
-        if os.path.exists(self.config_file):
+        config_path = self.config_file
+        if not os.path.exists(config_path):
+            # 尝试在脚本目录的父目录查找（支持从 scripts/ 子目录启动）
+            possible_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), self.config_file)
+            if os.path.exists(possible_path):
+                config_path = possible_path
+
+        if os.path.exists(config_path):
             try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self._config = Config.from_dict(data)
             except Exception as e:
-                print(f"[Config] Failed to load {self.config_file}: {e}")
+                print(f"[Config] Failed to load {config_path}: {e}")
                 self._config = Config()
         else:
             self._config = Config()

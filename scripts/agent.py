@@ -406,24 +406,45 @@ def call_llm(
 
     if provider == "minimax":
         # Anthropic messages API 格式
+        system_content = None
         anthropic_messages = []
         for msg in messages:
             role = msg.get("role", "")
             content = msg.get("content", "")
+            tool_calls = msg.get("tool_calls")
+            tool_call_id = msg.get("tool_call_id", "")
+
             if role == "system":
-                # Anthropic 不支持 system 消息，转为 user 消息
-                anthropic_messages.append({"role": "user", "content": f"## System\n{content}"})
+                # Anthropic 格式：system 作为顶级参数，不是消息
+                system_content = content
             elif role == "user":
                 anthropic_messages.append({"role": "user", "content": content})
             elif role == "assistant":
-                anthropic_messages.append({"role": "assistant", "content": content})
+                if tool_calls:
+                    # assistant 带 tool_calls：保留完整 content blocks
+                    blocks = []
+                    if content:
+                        blocks.append({"type": "text", "text": content})
+                    for tc in tool_calls:
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tc.get("id", ""),
+                            "name": tc.get("name", ""),
+                            "input": tc.get("input", {}),
+                        })
+                    anthropic_messages.append({"role": "assistant", "content": blocks})
+                else:
+                    anthropic_messages.append({"role": "assistant", "content": content})
             elif role == "tool":
-                # Anthropic 格式：tool 结果作为 user 消息
-                tool_content = msg.get("content", "")
-                tool_id = msg.get("tool_call_id", "")
+                # Anthropic 格式：tool 结果作为 user 消息的 tool_result content block
+                tool_result_content = str(content) if content else ""
                 anthropic_messages.append({
                     "role": "user",
-                    "content": f"[Tool Result for {tool_id}]:\n{tool_content}"
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": tool_call_id,
+                        "content": tool_result_content,
+                    }]
                 })
 
         data = {
@@ -431,6 +452,8 @@ def call_llm(
             "messages": anthropic_messages,
             "max_tokens": 150000,
         }
+        if system_content:
+            data["system"] = system_content
         if tools:
             data["tools"] = tools
 
@@ -451,15 +474,24 @@ def call_llm(
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
 
+    req_body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+    logger.debug(f"[CALL-LLM-REQ] url={api_url}, model={model}, msg_count={len(data.get('messages', []))}, "
+                 f"has_system={bool(data.get('system'))}, has_tools={bool(data.get('tools'))}, "
+                 f"tools_count={len(data.get('tools', []))}, body_len={len(req_body)}")
+
     req = urllib.request.Request(
         api_url,
-        data=json.dumps(data).encode("utf-8"),
+        data=req_body,
         headers=headers,
     )
 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read().decode("utf-8"))
+        # DEBUG: 检查API返回的content blocks类型
+        content_blocks = result.get("content", [])
+        block_types = [b.get("type", "?") if isinstance(b, dict) else type(b).__name__ for b in content_blocks]
+        logger.debug(f"[LLM-RESP] block_types={block_types}, stop_reason={result.get('stop_reason')}")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace") if e.fp else str(e)
         raise RuntimeError(f"HTTP {e.code} from API: {err_body[:500]}")
@@ -746,7 +778,16 @@ class Agent:
             return False, ""
 
         # Extract path from args
-        path = args.get("file_path") or args.get("path") or args.get("command", "").split()[1] if args.get("command") else ""
+        command = args.get("command", "")
+        if args.get("file_path"):
+            path = args["file_path"]
+        elif args.get("path"):
+            path = args["path"]
+        elif command:
+            parts = command.split()
+            path = parts[1] if len(parts) > 1 else ""
+        else:
+            path = ""
         if not path:
             return False, ""
 
@@ -1840,7 +1881,11 @@ class Agent:
             if m.role == "system":
                 messages.append({"role": "system", "content": m.content})
             elif m.role == "assistant":
-                messages.append({"role": "assistant", "content": m.content})
+                tc = getattr(m, "tool_calls", None)
+                if tc:
+                    messages.append({"role": "assistant", "content": m.content, "tool_calls": tc})
+                else:
+                    messages.append({"role": "assistant", "content": m.content})
             elif m.role == "tool":
                 messages.append({
                     "role": "tool",
@@ -1849,6 +1894,8 @@ class Agent:
                 })
             else:
                 messages.append({"role": "user", "content": m.content})
+        # Debug: log internal messages structure
+        logger.debug(f"[BUILD-MSGS] internal messages: {len(self.messages)}")
         return messages
 
     def _build_tools_list(self) -> list[dict]:
@@ -2066,6 +2113,8 @@ class Agent:
             route_result = await multi_executor.router.route(user_message)
             logger.info(f"[Multi-Agent] 路由决策: {route_result.level} (置信度: {route_result.confidence})")
 
+            logger.debug(f"[ROUTE] level={route_result.level}, confidence={route_result.confidence}")
+
             # L2/L3 直接委托给 Multi-Agent 执行器
             if route_result.level != ComplexityLevel.L1:
                 logger.info(f"[Multi-Agent] 委托给 MultiAgentExecutor 处理 {route_result.level} 级任务")
@@ -2074,7 +2123,12 @@ class Agent:
                     yield self._convert_multi_agent_event(event)
                 _set_current_agent(None)
                 return
+            else:
+                # L1: 不委托，继续走正常 Agent loop（含工具系统）
+                logger.info(f"[Multi-Agent] L1 任务，继续走正常 Agent loop")
         # ========== Multi-Agent 路由结束 ==========
+
+        logger.debug(f"[AGENT-LOOP] entering main loop, multi_agent={self.config.multi_agent_enabled}")
 
         while self.turn_count < self.config.max_turns:
             self.turn_count += 1
@@ -2110,6 +2164,7 @@ class Agent:
 
             # 调用 LLM
             try:
+                logger.debug(f"[CALL-LLM] tools={len(tools) if tools else 0}, turn={self.turn_count}")
                 response = call_llm(
                     api_messages,
                     model=self.config.model,
@@ -2164,6 +2219,7 @@ class Agent:
             # 解析 LLM 响应的所有 content blocks
             try:
                 blocks = parse_content_blocks(response)
+                logger.debug(f"[PARSED] {len(blocks)} blocks: {[b.get('type') for b in blocks]}")
             except Exception as e:
                 yield StreamEvent(type="tool_error", error=f"[解析响应失败] {e}\n响应: {str(response)[:300]}")
                 yield StreamEvent(type="done", content=f"[解析错误] {e}")
@@ -2214,17 +2270,27 @@ class Agent:
                     })
 
             # 输出所有文本 blocks
+            # 如果有 tool_calls，所有文本合并到一个 assistant message 中
+            # 否则每个文本块独立存储
             for block in text_blocks:
                 text = block.get("text", "").strip()
                 if text:
-                    msg = Message(role="assistant", content=text)
-                    self._add_message_with_index(msg)
-                    if assistant_message is None:
-                        assistant_message = msg
                     yield StreamEvent(type="text", content=text)
                     await _emit_structured_event("text", content=text)
+                    if has_tool_calls:
+                        # 合并文本到同一个 assistant message
+                        if assistant_message is None:
+                            assistant_message = Message(role="assistant", content=text)
+                            self._add_message_with_index(assistant_message)
+                        else:
+                            assistant_message.content += "\n" + text
+                    else:
+                        msg = Message(role="assistant", content=text)
+                        self._add_message_with_index(msg)
+                        if assistant_message is None:
+                            assistant_message = msg
 
-            # 如果有 tool_use，添加到 assistant message
+            # 如果有 tool_use，确保有 assistant message 并添加 tool_calls
             if tool_calls_list:
                 if assistant_message is None:
                     assistant_message = Message(
