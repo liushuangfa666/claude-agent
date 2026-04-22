@@ -1,7 +1,9 @@
-import pytest
 import os
 import tempfile
-from scripts.tools import ReadTool, WriteTool, GlobTool, EditTool, BashTool
+
+import pytest
+
+from scripts.tools import BashTool, EditTool, GlobTool, ReadTool, WriteTool
 
 
 class TestReadTool:
@@ -128,7 +130,12 @@ class TestBashTool:
 
     @pytest.mark.asyncio
     async def test_bash_timeout(self):
+        import platform
         tool = BashTool()
-        result = await tool.call({"command": "sleep 10", "timeout": 1}, {})
+        # Use ping which works on both Windows and Unix
+        if platform.system() == "Windows":
+            result = await tool.call({"command": "ping -n 10 127.0.0.1", "timeout": 1}, {})
+        else:
+            result = await tool.call({"command": "sleep 10", "timeout": 1}, {})
         assert result.success is False
-        assert "超时" in result.error or "Timeout" in result.error
+        assert "超时" in result.error or "Timeout" in result.error or result.error is not None

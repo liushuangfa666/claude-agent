@@ -1,31 +1,51 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Distribution / packaging
+*.so
+.Python
+*.egg-info/
 dist/
 build/
-*.egg-info/
-
-# Pytest
-.pytest_cache/
-.coverage
-htmlcov/
-
-# IDE
-.idea/
-.vscode/
-*.swp
 
 # Virtual environments
 venv/
 .venv/
 env/
 
-# Environment variables
-.env
-.env.local
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
 
-# GitHub
-.github/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.log
+crush.session
+.claude/settings.local.json
+
+# Config with API keys (keep local, don't push)
+crush.json
+claude.json
+
+# Dev/test docs (local only)
+docs/test-plan.md
+docs/test-report.md
+
+# Local data (153MB DB, logs)
+.crush/
+
+# Claude Code settings (local config)
+.claude/

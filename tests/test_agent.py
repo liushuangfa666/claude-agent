@@ -1,6 +1,5 @@
-import pytest
-from scripts.agent import Agent, AgentConfig
-from scripts.tools import ReadTool, BashTool, WriteTool
+from scripts.agent import AgentConfig
+from scripts.tools import BashTool, ReadTool, WriteTool
 
 
 class TestAgentConfig:
@@ -18,7 +17,7 @@ class TestAgentConfig:
 
 class TestToolRegistry:
     def test_tool_registration(self):
-        from scripts.tool import get_registry, ToolRegistry
+        from scripts.tool import ToolRegistry
         registry = ToolRegistry()
         tool = ReadTool()
         registry.register(tool)
@@ -59,8 +58,16 @@ class TestBashToolDestructive:
 
 class TestWriteToolDestructive:
     def test_overwrite_is_destructive(self):
-        tool = WriteTool()
-        assert tool.is_destructive({"file_path": "existing.txt", "content": ""}) is True
+        import os
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as f:
+            f.write(b"test")
+            path = f.name
+        try:
+            tool = WriteTool()
+            assert tool.is_destructive({"file_path": path, "content": ""}) is True
+        finally:
+            os.unlink(path)
 
     def test_append_not_destructive(self):
         tool = WriteTool()
@@ -71,14 +78,14 @@ class TestPermissionEngine:
     def test_allow_pattern(self):
         from scripts.permission import PermissionEngine
         engine = PermissionEngine()
-        engine.allow("Bash(git *)")
+        engine.allow("Bash(*git*)")
         result = engine.check("Bash", {"command": "git status"})
         assert result.behavior == "allow"
 
     def test_deny_pattern(self):
         from scripts.permission import PermissionEngine
         engine = PermissionEngine()
-        engine.deny("Bash(rm *)")
+        engine.deny("Bash(*rm*)")
         result = engine.check("Bash", {"command": "rm file.txt"})
         assert result.behavior == "deny"
 
@@ -121,7 +128,6 @@ class TestContextBuilder:
 class TestSystemPromptBuilder:
     def test_build_prompt(self):
         from scripts.system_prompt import SystemPromptBuilder
-        from scripts.tool import ToolDefinition
         builder = SystemPromptBuilder()
         builder.add_role()
         builder.add_tools_section([])

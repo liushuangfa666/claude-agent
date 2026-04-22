@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "参考 Claude Code 架构设计的 Agent 实现"
 requires-python = ">=3.10"
 
+[tool.setuptools.packages.find]
+include = ["scripts*"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
